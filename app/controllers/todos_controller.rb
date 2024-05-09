@@ -1,9 +1,9 @@
 class TodosController < ApplicationController
-  before_action :set_todo, only: %i[ show edit update destroy ]
+  before_action :set_todo, only: %i[show edit update destroy change_status]
 
   # GET /todos or /todos.json
   def index
-    @todos = Todo.all
+    @todos = Todo.where(status: params[:status].presence || 'incomplete')
   end
 
   # GET /todos/1 or /todos/1.json
@@ -25,11 +25,11 @@ class TodosController < ApplicationController
 
     respond_to do |format|
       if @todo.save
+        format.turbo_stream
         format.html { redirect_to todo_url(@todo), notice: "Todo was successfully created." }
-        format.json { render :show, status: :created, location: @todo }
       else
+        format.turbo_stream { render turbo_stream: turbo_stream.replace("#{helpers.dom_id(@todo)}_form", partial: "form", locals: { todo: @todo }) }
         format.html { render :new, status: :unprocessable_entity }
-        format.json { render json: @todo.errors, status: :unprocessable_entity }
       end
     end
   end
@@ -38,11 +38,11 @@ class TodosController < ApplicationController
   def update
     respond_to do |format|
       if @todo.update(todo_params)
+        format.turbo_stream
         format.html { redirect_to todo_url(@todo), notice: "Todo was successfully updated." }
-        format.json { render :show, status: :ok, location: @todo }
       else
+        format.turbo_stream { render turbo_stream: turbo_stream.replace("#{helpers.dom_id(@todo)}_form", partial: "form", locals: { todo: @todo }) }
         format.html { render :edit, status: :unprocessable_entity }
-        format.json { render json: @todo.errors, status: :unprocessable_entity }
       end
     end
   end
@@ -52,8 +52,17 @@ class TodosController < ApplicationController
     @todo.destroy!
 
     respond_to do |format|
+      format.turbo_stream { render turbo_stream: turbo_stream.remove("#{helpers.dom_id(@todo)}_container") }
       format.html { redirect_to todos_url, notice: "Todo was successfully destroyed." }
-      format.json { head :no_content }
+    end
+  end
+
+  # PATCH /todos/1/change_status
+  def change_status
+    @todo.update(status: todo_params[:status])
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: turbo_stream.remove("#{helpers.dom_id(@todo)}_container") }
+      format.html { redirect_to todos_path, notice: "Updated todo status." }
     end
   end
 
